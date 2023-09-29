@@ -23,7 +23,8 @@ class DB_api:
 			password=os.environ.get("POSTGRES_PASSWORD"),
 			database=os.environ.get("POSTGRES_DATABASE"),
 			host=os.environ.get("POSTGRES_HOST"),
-			port=5432
+			port=5432,
+			statement_cache_size=0
 		)
 		await self.cur.execute("""CREATE TABLE IF NOT EXISTS reports(
 			id SERIAL PRIMARY KEY,
