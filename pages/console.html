@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Минималистичная консоль</title>
+	<meta name="viewport" content="width=device-width">
+	<style>
+		body {
+			background-color: #000000;
+			color: #FFFFFF;
+			font-family: monospace;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			height: 100vh; /* Задаем высоту всего окна браузера */
+		}
+		#console {
+			background-color: #000000;
+			padding: 10px;
+			flex: 1; /* Занимает оставшееся пространство внутри body */
+			overflow-y: scroll;
+		}
+		#input-container {
+			background-color: #000000;
+			position: relative;
+		}
+		#input {
+			height: 50px;
+			background-color: #000000;
+			border: none;
+			color: #FFFFFF;
+			font-family: monospace;
+			padding: 10px;
+			width: 100%;
+			outline: none;
+			overflow: hidden;
+			box-sizing: border-box; /* Учитываем padding внутри input */
+		}
+
+		/* width */
+		::-webkit-scrollbar {
+			width: 10px;
+		}
+
+		/* Track */
+		::-webkit-scrollbar-track {
+			background: #000000;
+		}
+		 
+		/* Handle */
+		::-webkit-scrollbar-thumb {
+			border-radius: 50px;
+			background: #333; 
+		}
+
+		/* Handle on hover */
+		::-webkit-scrollbar-thumb:hover {
+			background: #555; 
+		}
+
+
+	</style>
+</head>
+<body>
+	<div id="console"></div>
+	<div id="input-container">
+		<input id="input" placeholder="Введите команду и нажмите Enter">
+	</div>
+	<script>
+		const consoleDiv = document.getElementById('console');
+		const inputField = document.getElementById('input');
+
+		inputField.addEventListener('keydown', function(event) {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				const command = inputField.value;
+				inputField.value = '';
+
+				console.log(`> ${command}`);
+				const output = executeCommand(command);
+				console.log(output);
+
+				const outputDiv = document.createElement('div');
+				outputDiv.textContent = output;
+				consoleDiv.appendChild(outputDiv);
+
+				const outputDiv2 = document.createElement('div');
+				if (command.toLowerCase().indexOf('слава') >= 0) {
+					outputDiv2.textContent = `[ПИЗДЕЖ] Україні!`;
+				}
+				else if (command.indexOf('ра')  >= 0){
+					outputDiv2.textContent = `[INFO] Nigger`;
+				}
+				else if (command.toLowerCase().indexOf('героям')  >= 0){
+					outputDiv2.textContent = `[INFO] Сало`;
+				}
+				else {
+					outputDiv2.textContent = `[ERROR] Command not found`;
+				}
+				consoleDiv.appendChild(outputDiv2);
+
+				// Прокручиваем консоль вниз, чтобы увидеть новые записи
+				consoleDiv.scrollTop = consoleDiv.scrollHeight;
+			}
+		});
+
+		function executeCommand(command) {
+			return `> ${command}`;
+		}
+	</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+fastapi
+pydantic
+uvicorn
+bcrypt
+starlette
+asyncpg
