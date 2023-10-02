@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3
 
-import asyncio, sqlite3, logging, uvicorn, bcrypt, random, json, time, base64, asyncpg, os
+import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, asyncpg, os
 from fastapi import FastAPI, Body, Header, Request, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, JSONResponse, Response, RedirectResponse, FileResponse
@@ -26,10 +26,12 @@ class DB_api:
 			port=5432,
 			statement_cache_size=0
 		)
+		await self.cur.execute("DROP TABLE reports")
 		await self.cur.execute("""CREATE TABLE IF NOT EXISTS reports(
 			id SERIAL PRIMARY KEY,
 			location TEXT,
 			timestamp BIGINT,
+			report_data TEXT,
 			reporter_data TEXT
 		)""")
 		await self.cur.execute("""CREATE TABLE IF NOT EXISTS middleware(
@@ -81,7 +83,7 @@ async def create_report(location: str, timestamp: int = int(time.time()), report
 	try:
 		db = DB_api()
 		await db.init()
-		await db.insert({'location':location, 'timestamp':timestamp, 'reporter_data':(base64.b64encode(json.dumps(reporter_data).encode())).decode()})
+		await db.insert({'location':location, 'timestamp':timestamp, 'report_data':base64.b64encode(f'{location}:{timestamp}'.encode()).decode(), 'reporter_data':base64.b64encode(json.dumps(reporter_data).encode()).decode()})
 		print(f'report created: {location}|{timestamp}')
 	except Exception as e: raise e; return False
 	return True
@@ -116,7 +118,7 @@ async def get_goons(request: Request, response: Response):
 	try:
 		db = DB_api()
 		await db.init()
-		return {'status': True, 'reports': await db.cur.fetch("SELECT location, timestamp FROM reports ORDER BY id DESC")}
+		return {'status': True, 'reports': await db.cur.fetch("SELECT location, timestamp, report_data FROM reports ORDER BY id DESC")}
 	except: return {'status': False, 'message':'Иди нахуй'}
 
 @app.get("/last_report")
@@ -124,7 +126,7 @@ async def last_report(request: Request, response: Response):
 	try:
 		db = DB_api()
 		await db.init()
-		return {'status': True, 'data': (await db.cur.fetchrow("SELECT location, timestamp FROM reports ORDER BY id DESC"))}
+		return {'status': True, 'data': (await db.cur.fetchrow("SELECT location, timestamp, report_data FROM reports ORDER BY id DESC"))}
 	except Exception as e:
 		raise e
 		return {'status': False, 'message':'Иди нахуй'}
