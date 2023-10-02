@@ -148,7 +148,7 @@ async def check_report_limit(request: Request, db):
 	user_fingerprint = request.headers.get("User-Agent")
 
 
-	last_report = await db.cur.fetchrow("SELECT * FROM middleware WHERE (user_ip) = ($1) and user_fingerprint = $2",user_ip,user_fingerprint)
+	last_report = await db.cur.fetchrow("SELECT * FROM middleware WHERE user_ip = $1 and user_fingerprint = $2",user_ip,user_fingerprint)
 	if last_report is not None:
 		last_report_time = last_report['timestamp']
 		time_difference = int(time.time()) - last_report_time
@@ -159,7 +159,7 @@ async def check_report_limit(request: Request, db):
 			else:
 				raise HTTPException(status_code=429, detail="You can send a report no more than once every 5 minutes")
 
-		await db.cur.execute("UPDATE middleware SET (user_ip, user_fingerprint, timestamp) = ($1, $2, $3)", user_ip, user_fingerprint, int(time.time()))
+		await db.cur.execute("UPDATE middleware SET (user_ip, user_fingerprint, timestamp) = ($1, $2, $3) WHERE user_ip = $1 and user_fingerprint = $2", user_ip, user_fingerprint, int(time.time()))
 	else:
 		await db.cur.execute("INSERT INTO middleware(user_ip, user_fingerprint, timestamp) VALUES ($1, $2, $3)", user_ip, user_fingerprint, int(time.time()))
 
