@@ -26,7 +26,6 @@ class DB_api:
 			port=5432,
 			statement_cache_size=0
 		)
-		await self.cur.execute("DROP TABLE reports")
 		await self.cur.execute("""CREATE TABLE IF NOT EXISTS reports(
 			id SERIAL PRIMARY KEY,
 			location TEXT,
