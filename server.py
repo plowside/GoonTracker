@@ -94,7 +94,7 @@ async def create_report(location: str, timestamp: int = int(time.time()), report
 @app.get("/")
 async def homepage_REDIRECT(request: Request, response: Response):
 	print(request.headers.get("Accept-Language"))
-	language = request.headers.get("Accept-Language")[2].lower()
+	language = request.headers.get("Accept-Language")[:2].lower()
 	if language in ['ru','uk','ua']:
 		return RedirectResponse("/ru")
 	else: 
