@@ -5,3 +5,4 @@ bcrypt
 starlette
 asyncpg
 resend
+httpx
