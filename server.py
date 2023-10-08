@@ -94,7 +94,7 @@ async def create_report(location: str, timestamp: int = int(time.time()), report
 async def send_email(to_emails: list, subject: str, html: str):
 	async with httpx.AsyncClient() as client:
 		payload = {
-			"from": "GoonTracker@resend.dev",
+			"from": "GoonTracker@goontracker.site",
 			"to": to_emails,
 			"subject": subject,
 			"html": html
