@@ -4,3 +4,4 @@ uvicorn
 bcrypt
 starlette
 asyncpg
+resend
