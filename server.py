@@ -1,10 +1,11 @@
 #!/usr/bin/python3.3
 
-import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, asyncpg, os
+import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, resend, asyncpg, os
 from fastapi import FastAPI, Body, Header, Request, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, JSONResponse, Response, RedirectResponse, FileResponse
 from datetime import datetime, timedelta
+
 
 class test:
 	def __init__(self):
@@ -13,6 +14,9 @@ class test:
 
 goon_V = test()
 app = FastAPI()
+resend.api_key = os.environ.get("RESEND_API_KEY")
+
+
 
 ########################## FUNCS ##########################
 
@@ -101,17 +105,21 @@ async def homepage_REDIRECT(request: Request, response: Response):
 			return RedirectResponse("/en")
 	except: return RedirectResponse("/en")
 
+
 @app.get("/ru")
 async def homepage_RU(request: Request, response: Response):
 	return HTMLResponse(await render_html('RU/index.html'))
+
 
 @app.get("/en")
 async def homepage_EN(request: Request, response: Response):
 	return HTMLResponse(await render_html('EN/index.html'))
 
+
 @app.get("/console")
 async def console(request: Request, response: Response):
 	return HTMLResponse(await render_html('console.html'))
+
 
 @app.get("/.well-known/discord")
 async def verif(request: Request, response: Response):
@@ -125,6 +133,7 @@ async def get_goons(request: Request, response: Response):
 		await db.init()
 		return {'status': True, 'reports': await db.cur.fetch("SELECT location, timestamp, report_data FROM reports ORDER BY id DESC")}
 	except: return {'status': False, 'message':'Иди нахуй'}
+
 
 @app.get("/last_report")
 async def last_report(request: Request, response: Response):
@@ -145,6 +154,38 @@ async def send_report(data: Credentials, request: Request, response: Response):
 		return {'status': False, 'message':'Иди нахуй'}
 
 
+@app.post("/auth")
+async def verification(request: Request, response: Response):
+	json_ = await request.json()
+	print(json_)
+
+	code = ''.join(str(random.randint(0, 9)) for _ in range(6))
+	try:
+		r = resend.Emails.send({
+		"from": "GoonTracker@resend.dev",
+		"to": json_['email'],
+		"subject": f"Ваш код - {code}",
+		"html": """<!DOCTYPE html>
+		<html>
+		<head>
+			<meta charset="UTF-8">
+			<title>Подтверждение адреса электронной почты</title>
+			<style>
+				a {
+					text-decoration: none;
+				}
+			</style>
+		</head>
+		<body>
+			<p>Ваш код: <strong>%s</strong>. Его можно использовать, чтобы подтвердить адрес электронной почты для входа в <a href="http://goontracker.site">GoonTracker</a>.</p>
+			<p>Если Вы не запрашивали это сообщение, проигнорируйте его.</p>
+			<p>С уважением, Команда <strong>GoonTracker</strong></p>.
+		</body>
+		</html>
+		"""%(code)})
+		return {'status': True, 'id': r['id']}
+
+	except Exception as e: logging.error(e); return {'status': False, 'message': 'Слишком частая отправка запросов'}
 ######################## MIDDLEWARE #######################
 
 
@@ -173,7 +214,7 @@ async def check_report_limit(request: Request, db):
 @app.middleware("http")
 async def add_custom_middleware(request: Request, call_next):
 	start_time = int(time.time())
-	if request.url.path == '/send_report':	#/send_report
+	if request.url.path == '/send_report':		#/send_report
 		db = DB_api()
 		await db.init()
 		try:
