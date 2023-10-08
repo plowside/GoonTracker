@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3
 
-import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, resend, asyncpg, os
+import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, httpx, resend, asyncpg, os
 from fastapi import FastAPI, Body, Header, Request, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, JSONResponse, Response, RedirectResponse, FileResponse
@@ -14,7 +14,6 @@ class test:
 
 goon_V = test()
 app = FastAPI()
-resend.api_key = os.environ.get("RESEND_API_KEY")
 
 
 
@@ -92,6 +91,23 @@ async def create_report(location: str, timestamp: int = int(time.time()), report
 	return True
 
 
+async def send_email(to_emails: list, subject: str, html: str):
+	async with httpx.AsyncClient() as client:
+		payload = {
+			"from": "GoonTracker@resend.dev",
+			"to": to_emails,
+			"subject": subject,
+			"html": html
+			}
+		
+		req = await client.post('https://api.resend.com/emails',
+			headers={'Authorization': f'Bearer {os.environ.get("RESEND_API_KEY")}', 'Content-Type': 'application/json'},
+			json=payload
+			)
+
+	return req.json()
+
+
 ######################### ROUTES #############################
 
 
@@ -157,33 +173,13 @@ async def send_report(data: Credentials, request: Request, response: Response):
 @app.post("/auth")
 async def verification(request: Request, response: Response):
 	json_ = await request.json()
-	print(json_)
 
 	code = ''.join(str(random.randint(0, 9)) for _ in range(6))
 	try:
-		r = resend.Emails.send({
-		"from": "GoonTracker@resend.dev",
-		"to": json_['email'],
-		"subject": f"Ваш код - {code}",
-		"html": """<!DOCTYPE html>
-		<html>
-		<head>
-			<meta charset="UTF-8">
-			<title>Подтверждение адреса электронной почты</title>
-			<style>
-				a {
-					text-decoration: none;
-				}
-			</style>
-		</head>
-		<body>
-			<p>Ваш код: <strong>%s</strong>. Его можно использовать, чтобы подтвердить адрес электронной почты для входа в <a href="http://goontracker.site">GoonTracker</a>.</p>
-			<p>Если Вы не запрашивали это сообщение, проигнорируйте его.</p>
-			<p>С уважением, Команда <strong>GoonTracker</strong></p>.
-		</body>
-		</html>
-		"""%(code)})
-		return {'status': True, 'id': r['id']}
+		html = """<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>Подтверждение адреса электронной почты</title>\n<style>\na {\ntext-decoration: none;\n}\n</style>\n</head>\n<body>\n<p>Ваш код: <strong>%s</strong>. Его можно использовать, чтобы подтвердить адрес электронной почты для входа в <a href="http://goontracker.site">GoonTracker</a>.</p>\n<p>Если Вы не запрашивали это сообщение, проигнорируйте его.</p>\n<p>С уважением, Команда <strong>GoonTracker</strong>.</p>\n</body>\n</html>"""%(code)
+		req = await send_email([json_['email']], f"Ваш код - {code}", html)
+
+		return {'status': True, 'id': req['id']}
 
 	except Exception as e: logging.error(e); return {'status': False, 'message': 'Слишком частая отправка запросов'}
 ######################## MIDDLEWARE #######################
