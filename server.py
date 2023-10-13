@@ -10,7 +10,7 @@ from asyncache import cached
 
 app = FastAPI()
 
-cache = cachetools.TTLCache(maxsize=100, ttl=240)
+cache = cachetools.TTLCache(maxsize=100, ttl=180)
 openai.api_key = os.environ.get('OPENAI_KEY')
 ########################## FUNCS ##########################
 
@@ -170,9 +170,9 @@ async def gpt_res(data: dTP_GPT, request: Request, response: Response):
 	try:
 		q = data.query
 		conf = data.history
+		print(cache.get(q))
 		if cache.get(q) is None: cache[q] = {'end': False, 'answer': ''}
-		
-		else: await asyncio.sleep(1); _ = cache.get(q); return {'status': True, 'data': _['answer'], 'end': _['end']}
+		else: _ = cache.get(q); return {'status': True, 'data': _['answer'], 'end': _['end']}
 
 
 		asyncio.get_event_loop().create_task(gpt_response(q, conf))
