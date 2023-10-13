@@ -1,22 +1,17 @@
 #!/usr/bin/python3.3
 
-import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, httpx, resend, asyncpg, os
+import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, httpx, resend, asyncpg, os, cachetools, openai
 from fastapi import FastAPI, Body, Header, Request, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, JSONResponse, Response, RedirectResponse, FileResponse
 from datetime import datetime, timedelta
+from cachetools import TTLCache
+from asyncache import cached
 
-
-class test:
-	def __init__(self):
-		self.reports = []
-		self.last_report = {"location": None, "timestamp": None, "reporter_id": None}
-
-goon_V = test()
 app = FastAPI()
 
-
-
+cache = cachetools.TTLCache(maxsize=100, ttl=240)
+openai.api_key = os.environ.get('POSTGRES_URL')
 ########################## FUNCS ##########################
 
 class DB_api:
@@ -69,16 +64,18 @@ async def render_html(path: str):
 
 
 
-
-
-
-
-class Credentials(BaseModel):
+class dTP_Report(BaseModel):
 	location: str
 	ts: int
 
+class dTP_GPT(BaseModel):
+	query: str
+	history: list = []
 
-
+class dTP_Creds(BaseModel):
+	login: str = ''
+	email: str
+	password: str
 
 
 async def create_report(location: str, timestamp: int = int(time.time()), reporter_data: dict = {'user_ip': '127.0.0.1', 'user_fingerprint': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36'}):
@@ -162,8 +159,35 @@ async def last_report(request: Request, response: Response):
 		return {'status': False, 'message':'Иди нахуй'}
 
 
+
+
+@app.get("/gpt")
+async def gpt(request: Request, response: Response):
+	return HTMLResponse(await render_html('chatGPT.html'))
+
+@app.post("/gpt/res")
+async def gpt_res(data: dTP_GPT, request: Request, response: Response):
+	try:
+		q = data.query
+		conf = data.history
+		if cache.get(q) is None: cache[q] = {'end': False, 'answer': ''}
+		
+		else: await asyncio.sleep(1); _ = cache.get(q); return {'status': True, 'data': _['answer'], 'end': _['end']}
+
+
+		asyncio.get_event_loop().create_task(gpt_response(q, conf))
+		await asyncio.sleep(3)
+
+		_ = cache.get(q)
+		return {'status': True, 'data': _['answer'], 'end': _['end']}
+
+	except Exception as e: return {'status': False, 'message': e}
+
+
+
+
 @app.post("/send_report")
-async def send_report(data: Credentials, request: Request, response: Response):
+async def send_report(data: dTP_Report, request: Request, response: Response):
 	if await create_report(data.location, data.ts, {'user_ip': request.client.host, 'user_fingerprint': request.headers.get("User-Agent")}):
 		return {'status': True, 'data': {'location': data.location, 'timestamp': data.ts}}
 	else:
@@ -171,7 +195,7 @@ async def send_report(data: Credentials, request: Request, response: Response):
 
 
 @app.post("/auth")
-async def verification(request: Request, response: Response):
+async def verification(data: dTP_Creds, request: Request, response: Response):
 	json_ = await request.json()
 
 	code = ''.join(str(random.randint(0, 9)) for _ in range(6))
@@ -183,6 +207,38 @@ async def verification(request: Request, response: Response):
 
 	except Exception as e: logging.error(e); return {'status': False, 'message': 'Слишком частая отправка запросов'}
 ######################## MIDDLEWARE #######################
+class openai_plowsidee:
+	def __init__(self):
+		self.alive = True
+		self.response = ''
+
+	async def create_conversation(self, question, conf=[]):
+		conf.append({"role": "user", "content": question})
+		last_resp = ''
+
+		async for resp in await openai.ChatCompletion.acreate(model='gpt-3.5-turbo', messages=conf, max_tokens=2048, stream=True):
+			if resp.choices[0].finish_reason != None: self.alive=False;break
+			try:
+				if resp.choices[0].delta.content != last_resp:
+					self.response+=str(resp.choices[0].delta.content)
+					last_resp = resp.choices[0].delta.content
+			except:pass
+		self.alive=False
+
+async def gpt_response(q, conf = []):
+	op = openai_plowsidee()
+	asyncio.get_event_loop().create_task(op.create_conversation(q, conf))
+	last_resp = 0
+
+	while op.alive:
+		if len(op.response) - last_resp > 10:
+			answer = op.response
+			last_resp = len(answer)
+			cache[q]['answer'] = answer
+		
+		await asyncio.sleep(.5)
+
+	cache[q] = {'end': True, 'answer': op.response}
 
 
 
@@ -205,6 +261,7 @@ async def check_report_limit(request: Request, db):
 		await db.cur.execute("UPDATE middleware SET (user_ip, user_fingerprint, timestamp) = ($1, $2, $3) WHERE user_ip = $1 and user_fingerprint = $2", user_ip, user_fingerprint, int(time.time()))
 	else:
 		await db.cur.execute("INSERT INTO middleware(user_ip, user_fingerprint, timestamp) VALUES ($1, $2, $3)", user_ip, user_fingerprint, int(time.time()))
+
 
 
 @app.middleware("http")
