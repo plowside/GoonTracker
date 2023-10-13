@@ -11,7 +11,7 @@ from asyncache import cached
 app = FastAPI()
 
 cache = cachetools.TTLCache(maxsize=100, ttl=240)
-openai.api_key = os.environ.get('POSTGRES_URL')
+openai.api_key = os.environ.get('OPENAI_KEY')
 ########################## FUNCS ##########################
 
 class DB_api:
