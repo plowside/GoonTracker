@@ -6,3 +6,5 @@ starlette
 asyncpg
 resend
 httpx
+cachetools
+asyncache
