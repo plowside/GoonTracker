@@ -170,13 +170,16 @@ async def gpt_res(data: dTP_GPT, request: Request, response: Response):
 	try:
 		q = data.query
 		conf = data.history
-		print(cache.get(q))
 		if cache.get(q) is None: cache[q] = {'end': False, 'answer': ''}
 		else: _ = cache.get(q); return {'status': True, 'data': _['answer'], 'end': _['end']}
 
+		conf.append({"role": "user", "content": q})
+		z = await openai.ChatCompletion.acreate(model='gpt-3.5-turbo', messages=conf, max_tokens=2048)
+		cache[q] = {'end': True, 'answer': z.choices[0].message.content}
+		print('nigger')
 
-		asyncio.get_event_loop().create_task(gpt_response(q, conf))
-		await asyncio.sleep(3)
+		#asyncio.get_event_loop().create_task(gpt_response(q, conf))
+		#await asyncio.sleep(3)
 
 		_ = cache.get(q)
 		return {'status': True, 'data': _['answer'], 'end': _['end']}
@@ -226,10 +229,14 @@ class openai_plowsidee:
 		self.alive=False
 
 async def gpt_response(q, conf = []):
+	conf.append({"role": "user", "content": question})
+	z = await openai.ChatCompletion.acreate(model='gpt-3.5-turbo', messages=conf, max_tokens=2048)
+	cache[q] = {'end': True, 'answer': z.choices[0].message.content}
+
+	return
 	op = openai_plowsidee()
 	asyncio.get_event_loop().create_task(op.create_conversation(q, conf))
 	last_resp = 0
-
 	while op.alive:
 		if len(op.response) - last_resp > 10:
 			answer = op.response
