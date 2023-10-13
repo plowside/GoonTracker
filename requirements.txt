@@ -8,3 +8,4 @@ resend
 httpx
 cachetools
 asyncache
+openai
