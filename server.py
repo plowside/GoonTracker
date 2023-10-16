@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3
 
-import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, httpx, resend, asyncpg, os, cachetools, openai
+import asyncio, sqlite3, logging, uvicorn, random, json, time, base64, httpx, resend, asyncpg, os, cachetools, openai, threading
 from fastapi import FastAPI, Body, Header, Request, HTTPException
 from pydantic import BaseModel
 from starlette.responses import HTMLResponse, JSONResponse, Response, RedirectResponse, FileResponse
@@ -173,13 +173,10 @@ async def gpt_res(data: dTP_GPT, request: Request, response: Response):
 		if cache.get(q) is None: cache[q] = {'end': False, 'answer': ''}
 		else: _ = cache.get(q); return {'status': True, 'data': _['answer'], 'end': _['end']}
 
-		conf.append({"role": "user", "content": q})
-		z = await openai.ChatCompletion.acreate(model='gpt-3.5-turbo', messages=conf, max_tokens=2048)
-		cache[q] = {'end': True, 'answer': z.choices[0].message.content}
-		print('nigger')
-
+		thread = threading.Thread(target=gpt_response_, args=[q, conf])
+		thread.start()
 		#asyncio.get_event_loop().create_task(gpt_response(q, conf))
-		#await asyncio.sleep(3)
+		await asyncio.sleep(3)
 
 		_ = cache.get(q)
 		return {'status': True, 'data': _['answer'], 'end': _['end']}
@@ -228,15 +225,24 @@ class openai_plowsidee:
 			except:pass
 		self.alive=False
 
-async def gpt_response(q, conf = []):
-	conf.append({"role": "user", "content": question})
-	z = await openai.ChatCompletion.acreate(model='gpt-3.5-turbo', messages=conf, max_tokens=2048)
-	cache[q] = {'end': True, 'answer': z.choices[0].message.content}
+	def create_conversation_(self, question, conf=[]):
+		conf.append({"role": "user", "content": question})
+		last_resp = ''
 
-	return
+		for resp in openai.ChatCompletion.create(model='gpt-3.5-turbo', messages=conf, max_tokens=2048, stream=True):
+			if resp.choices[0].finish_reason != None: self.alive=False;break
+			try:
+				if resp.choices[0].delta.content != last_resp:
+					self.response+=str(resp.choices[0].delta.content)
+					last_resp = resp.choices[0].delta.content
+			except:pass
+		self.alive=False
+
+async def gpt_response(q, conf = []):
 	op = openai_plowsidee()
 	asyncio.get_event_loop().create_task(op.create_conversation(q, conf))
 	last_resp = 0
+
 	while op.alive:
 		if len(op.response) - last_resp > 10:
 			answer = op.response
@@ -244,6 +250,22 @@ async def gpt_response(q, conf = []):
 			cache[q]['answer'] = answer
 		
 		await asyncio.sleep(.5)
+
+	cache[q] = {'end': True, 'answer': op.response}
+
+def gpt_response_(q, conf = []):
+	op = openai_plowsidee()
+	threading.Thread(target=op.create_conversation_, args=[q, conf]).start()
+
+	last_resp = 0
+
+	while op.alive:
+		if len(op.response) - last_resp > 10:
+			answer = op.response
+			last_resp = len(answer)
+			cache[q]['answer'] = answer
+		
+		time.sleep(.5)
 
 	cache[q] = {'end': True, 'answer': op.response}
 

@@ -263,7 +263,7 @@
 
 						if (!data.end) {
 							// Если 'end' не равно true, отправляем запрос снова
-							sendRequest(false, q);
+							setTimeout(() => { sendRequest(false, q); }, 1000);
 						}
 					} else {
 						result.innerHTML = data.message;
