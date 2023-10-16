@@ -66,7 +66,6 @@ async def render_html(path: str):
 
 class dTP_Report(BaseModel):
 	location: str
-	ts: int
 
 class dTP_GPT(BaseModel):
 	query: str
@@ -187,8 +186,9 @@ async def gpt_res(data: dTP_GPT, request: Request, response: Response):
 
 @app.post("/send_report")
 async def send_report(data: dTP_Report, request: Request, response: Response):
-	if await create_report(data.location, data.ts, {'user_ip': request.client.host, 'user_fingerprint': request.headers.get("User-Agent")}):
-		return {'status': True, 'data': {'location': data.location, 'timestamp': data.ts}}
+	ts = int(time.time())
+	if await create_report(data.location, ts, {'user_ip': request.client.host, 'user_fingerprint': request.headers.get("User-Agent")}):
+		return {'status': True, 'data': {'location': data.location, 'timestamp': ts, 'report_data': base64.b64encode(f'{data.location}:{ts}'.encode()).decode()}}
 	else:
 		return {'status': False, 'message':'Иди нахуй'}
 
@@ -251,7 +251,7 @@ async def check_report_limit(request: Request, db):
 		last_report_time = last_report['timestamp']
 		time_difference = int(time.time()) - last_report_time
 
-		if time_difference < 300:
+		if time_difference < 1:
 			if 'ru' in str(request.headers.get("Referer")):
 				raise HTTPException(status_code=429, detail="Вы можете отправить репорт не чаще одного раза в 5 минут")
 			else:
